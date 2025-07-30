@@ -1,47 +1,137 @@
-import React, { useState, useEffect } from 'react';
-import logo from './logo.svg';
-import './App.css';
+import React, { useState, useEffect } from "react";
+import "./App.css";
+import TodoList from "./TodoList";
+import TodoInput from "./TodoInput";
+import {
+  fetchTodos,
+  createTodo,
+  updateTodo,
+  deleteTodo,
+  toggleComplete,
+} from "./TodoAPI";
 
 // PUBLIC_INTERFACE
+/**
+ * Main App Component for Todo Frontend
+ * Features: list, add, edit, delete, toggle complete. Responsive. Light theme.
+ */
 function App() {
-  const [theme, setTheme] = useState('light');
+  const [theme, setTheme] = useState("light");
+  const [todos, setTodos] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [editId, setEditId] = useState(null);
+  const [editText, setEditText] = useState("");
 
-  // Effect to apply theme to document element
+  // Properly apply theme var to document root
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
+    document.documentElement.setAttribute("data-theme", theme);
   }, [theme]);
+
+  useEffect(() => {
+    // Load todos on mount
+    (async () => {
+      setLoading(true);
+      try {
+        const data = await fetchTodos();
+        setTodos(data);
+      } catch (e) {
+        // Silently fail for minimal UI
+        setTodos([]);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
 
   // PUBLIC_INTERFACE
   const toggleTheme = () => {
-    setTheme(prevTheme => prevTheme === 'light' ? 'dark' : 'light');
+    setTheme((prev) => (prev === "light" ? "dark" : "light"));
+  };
+
+  // PUBLIC_INTERFACE
+  const handleAddTodo = async (text) => {
+    const newTodo = await createTodo(text);
+    setTodos((prev) => [newTodo, ...prev]);
+  };
+
+  // PUBLIC_INTERFACE
+  const handleEditTodo = (id, currentText) => {
+    setEditId(id);
+    setEditText(currentText);
+  };
+
+  // PUBLIC_INTERFACE
+  const handleSaveEdit = async (newText) => {
+    if (editId && newText) {
+      const updated = await updateTodo(editId, newText);
+      setTodos((prev) =>
+        prev.map((t) => (t.id === editId ? updated : t))
+      );
+      setEditId(null);
+      setEditText("");
+    }
+  };
+
+  // PUBLIC_INTERFACE
+  const handleCancelEdit = () => {
+    setEditId(null);
+    setEditText("");
+  };
+
+  // PUBLIC_INTERFACE
+  const handleDeleteTodo = async (id) => {
+    await deleteTodo(id);
+    setTodos((prev) => prev.filter((t) => t.id !== id));
+    handleCancelEdit();
+  };
+
+  // PUBLIC_INTERFACE
+  const handleToggleComplete = async (id, completed) => {
+    const updated = await toggleComplete(id, completed);
+    setTodos((prev) =>
+      prev.map((t) => (t.id === id ? updated : t))
+    );
   };
 
   return (
     <div className="App">
-      <header className="App-header">
-        <button 
-          className="theme-toggle" 
+      <header className="todo-header">
+        <div className="todo-title">📝 Todo App</div>
+        <button
+          className="theme-toggle"
           onClick={toggleTheme}
-          aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
+          aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`}
         >
-          {theme === 'light' ? '🌙 Dark' : '☀️ Light'}
+          {theme === "light" ? "🌙 Dark" : "☀️ Light"}
         </button>
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <p>
-          Current theme: <strong>{theme}</strong>
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
       </header>
+      <main className="todo-main">
+        {loading ? (
+          <div className="todo-loading">Loading...</div>
+        ) : (
+          <React.Fragment>
+            <TodoList
+              todos={todos}
+              onToggle={handleToggleComplete}
+              onDelete={handleDeleteTodo}
+              onEdit={handleEditTodo}
+            />
+            <div className="todo-form-area">
+              <TodoInput
+                onSubmit={editId ? handleSaveEdit : handleAddTodo}
+                initialValue={editText}
+                editMode={!!editId}
+                onCancel={handleCancelEdit}
+              />
+            </div>
+          </React.Fragment>
+        )}
+      </main>
+      <footer className="todo-footer">
+        <span>
+          &copy; {new Date().getFullYear()} Minimal Todo • Modern, Responsive, Light Theme
+        </span>
+      </footer>
     </div>
   );
 }
